@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Threat } from '@/types/threats';
+import { useThreats } from '@/hooks/useThreats';
+
+const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 
 export interface CyberIncident {
@@ -87,21 +90,24 @@ const convertThreatToIncident = (threat: Threat): CyberIncident => {
   };
 };
 
-const Map = ({ threats, isLoading, error }: MapProps) => {
+const Map = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [mapboxToken, setMapboxToken] = useState<string>('');
   const [selectedIncident, setSelectedIncident] = useState<CyberIncident | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredIncidents, setFilteredIncidents] = useState<CyberIncident[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
 
+  // Use the hook to fetch threats data
+  const { data: threats, isLoading, error, refetch } = useThreats();
+  console.log('useThreats hook result:', { threats, isLoading, error });
   // Convert API threats to incidents or use sample data
   const allIncidents = React.useMemo(() => {
-    if (threats && threats.threats) {
-      console.log('Using API threats data:', threats.threats);
-      return threats.threats.map(convertThreatToIncident);
+    if (threats && threats?.data) {
+      console.log('Using API threats data:', threats?.data);
+      return threats?.data?.map(convertThreatToIncident);
     }
+
     console.log('Using sample incidents data');
     return sampleIncidents;
   }, [threats]);
@@ -162,7 +168,7 @@ const Map = ({ threats, isLoading, error }: MapProps) => {
         border: 3px solid rgba(255, 255, 255, 0.8);
         cursor: pointer;
         box-shadow: 0 0 15px ${getSeverityColor(incident.severity)}aa;
-        z-index: 1000;
+        z-index: 50;
         transform: translate(-50%, -50%);
       `;
 
@@ -196,7 +202,8 @@ const Map = ({ threats, isLoading, error }: MapProps) => {
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/dark-v11',
+        // style: 'mapbox://styles/mapbox/dark-v11',
+        style: 'mapbox://styles/mapbox/light-v11',
         projection: 'globe',
         zoom: 2,
         center: [30, 15],
@@ -210,7 +217,7 @@ const Map = ({ threats, isLoading, error }: MapProps) => {
         new mapboxgl.NavigationControl({
           visualizePitch: true,
         }),
-        'top-right'
+        'bottom-left'
       );
 
       // Add load event listener
@@ -254,35 +261,35 @@ const Map = ({ threats, isLoading, error }: MapProps) => {
     }
   }, [mapLoaded, filteredIncidents]);
 
-  if (!mapboxToken) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="gradient-text">CyberSecurity Map Setup</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Please enter your Mapbox public token to view the cybersecurity incident map.
-            </p>
-            <Input
-              type="text"
-              placeholder="Enter Mapbox public token..."
-              value={mapboxToken}
-              onChange={(e) => setMapboxToken(e.target.value)}
-              className="w-full"
-            />
-            <p className="text-sm text-muted-foreground">
-              Get your token at{' '}
-              <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                mapbox.com
-              </a>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // if (!mapboxToken) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center p-4">
+  //       <Card className="w-full max-w-md">
+  //         <CardHeader>
+  //           <CardTitle className="gradient-text">CyberSecurity Map Setup</CardTitle>
+  //         </CardHeader>
+  //         <CardContent className="space-y-4">
+  //           <p className="text-muted-foreground">
+  //             Please enter your Mapbox public token to view the cybersecurity incident map.
+  //           </p>
+  //           <Input
+  //             type="text"
+  //             placeholder="Enter Mapbox public token..."
+  //             value={mapboxToken}
+  //             onChange={(e) => setMapboxToken(e.target.value)}
+  //             className="w-full"
+  //           />
+  //           <p className="text-sm text-muted-foreground">
+  //             Get your token at{' '}
+  //             <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+  //               mapbox.com
+  //             </a>
+  //           </p>
+  //         </CardContent>
+  //       </Card>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="relative w-full h-screen">
@@ -295,7 +302,7 @@ const Map = ({ threats, isLoading, error }: MapProps) => {
 
       {/* Search and Stats Panel */}
       <div className="absolute top-4 left-4 z-10 space-y-4">
-        <Card className="w-80 cyber-shadow">
+        <Card className="w-80 cyber-shadow z-100">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm gradient-text">Global Threat Monitor</CardTitle>
           </CardHeader>
