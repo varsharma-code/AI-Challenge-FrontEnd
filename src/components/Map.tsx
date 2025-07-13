@@ -1,21 +1,29 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { IncidentPopup } from './IncidentPopup';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Threat } from '@/types/threats';
+import { Threat, Severity, AttackType } from '@/types/threats'; // Import Severity and AttackType
 import { useThreats } from '@/hooks/useThreats';
+
+// Assuming these types are correctly imported from '@/types/threats'
+// If not, you might need to hardcode them here or adjust the import path.
+const SEVERITY_OPTIONS: Severity[] = ['low', 'medium', 'high', 'critical'];
+const ATTACK_TYPE_OPTIONS: AttackType[] = [
+  'Malware', 'Phishing', 'DDoS', 'Exploit', 'InsiderThreat', 'Physical',
+  'SupplyChain', 'WebAttack', 'AccountCompromise', 'DataBreach', 'Ransomware'
+];
 
 const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
-
+// Ensure CyberIncident matches the Threat interface for seamless conversion
 export interface CyberIncident {
   id: string;
   title: string;
   description: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  severity: Severity; // Use imported Severity type
   location: {
     lat: number;
     lng: number;
@@ -24,17 +32,11 @@ export interface CyberIncident {
   };
   timestamp: string;
   affectedSystems: string[];
-  attackType: string;
-  source?: string;
-}
-// Props interface for Map component
-interface MapProps {
-  threats?: { threats: Threat[] } | null;
-  isLoading?: boolean;
-  error?: any;
+  attackType: AttackType; // Use imported AttackType type
+  source: string; // Source is required in Threat interface
 }
 
-// Sample data structure for demonstration
+// Sample data structure for demonstration (updated to match CyberIncident interface)
 const sampleIncidents: CyberIncident[] = [
   {
     id: '1',
@@ -44,7 +46,7 @@ const sampleIncidents: CyberIncident[] = [
     location: { lat: 40.7128, lng: -74.0060, country: 'USA', city: 'New York' },
     timestamp: new Date().toISOString(),
     affectedSystems: ['Industrial Control Systems', 'Financial Networks'],
-    attackType: 'APT',
+    attackType: 'Exploit', // Changed to match AttackType enum
     source: 'Government Alert'
   },
   {
@@ -66,26 +68,27 @@ const sampleIncidents: CyberIncident[] = [
     location: { lat: 35.6762, lng: 139.6503, country: 'Japan', city: 'Tokyo' },
     timestamp: new Date(Date.now() - 7200000).toISOString(),
     affectedSystems: ['Customer Database', 'Transaction Systems'],
-    attackType: 'Data Breach',
+    attackType: 'DataBreach', // Changed to match AttackType enum
     source: 'Internal Security'
   }
 ];
 
+// Conversion function from backend Threat to frontend CyberIncident
 const convertThreatToIncident = (threat: Threat): CyberIncident => {
   return {
     id: threat.id,
-    title: threat.title, // Use type as title
+    title: threat.title,
     description: threat.description,
-    severity: threat.severity as 'critical' | 'high' | 'medium' | 'low',
+    severity: threat.severity, // Direct assignment as types align
     location: {
       lat: threat.location.lat,
       lng: threat.location.lng,
       country: threat.location.country,
-      city: threat.location.city || 'Unknown'
+      city: threat.location.city || 'Unknown' // Fallback for city
     },
     timestamp: threat.timestamp,
-    affectedSystems: [], // API might not have this field
-    attackType: threat.attackType,
+    affectedSystems: threat.affectedSystems || [], // Ensure array, even if null/undefined from API
+    attackType: threat.attackType, // Direct assignment as types align
     source: threat.source
   };
 };
@@ -95,49 +98,62 @@ const Map = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<CyberIncident | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSeverity, setSelectedSeverity] = useState<Severity | 'all'>('all'); // New state for severity filter
+  const [selectedAttackType, setSelectedAttackType] = useState<AttackType | 'all'>('all'); // New state for attack type filter
   const [filteredIncidents, setFilteredIncidents] = useState<CyberIncident[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // Use the hook to fetch threats data
-  const { data: threats, isLoading, error, refetch } = useThreats();
-  console.log('useThreats hook result:', { threats, isLoading, error });
+  const { data: threatsResponse, isLoading, error, refetch } = useThreats(); // Renamed data to threatsResponse
+  console.log('useThreats hook result:', { threatsResponse, isLoading, error });
+
   // Convert API threats to incidents or use sample data
-  const allIncidents = React.useMemo(() => {
-    if (threats && threats?.data) {
-      console.log('Using API threats data:', threats?.data);
-      return threats?.data?.map(convertThreatToIncident);
+  const allIncidents = useMemo(() => { // Changed React.useMemo to useMemo directly
+    // Check if threatsResponse.threats exists and is an array
+    if (threatsResponse && threatsResponse?.data && Array.isArray(threatsResponse?.data)) {
+      console.log('Using API threats data:', threatsResponse?.data);
+      return threatsResponse?.data?.map(convertThreatToIncident);
     }
 
     console.log('Using sample incidents data');
     return sampleIncidents;
-  }, [threats]);
+  }, [threatsResponse]); // Dependency on threatsResponse
 
-  console.log('Map component rendered with:', { 
-    threatsCount: threats?.threats?.length || 0, 
+  console.log('Map component rendered with:', {
+    threatsCount: threatsResponse?.threats?.length || 0,
     incidentsCount: allIncidents.length,
     isLoading,
-    error 
+    error
   });
 
-  // Filter incidents based on search term
+  // Filter incidents based on search term and new dropdowns
   useEffect(() => {
-    const filtered = allIncidents.filter(incident =>
-      incident.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      incident.location.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      incident.attackType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      incident.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filtered = allIncidents.filter(incident => {
+      const matchesSearchTerm =
+        incident.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        incident.location.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        incident.attackType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        incident.description.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesSeverity =
+        selectedSeverity === 'all' || incident.severity === selectedSeverity;
+
+      const matchesAttackType =
+        selectedAttackType === 'all' || incident.attackType === selectedAttackType;
+
+      return matchesSearchTerm && matchesSeverity && matchesAttackType;
+    });
     setFilteredIncidents(filtered);
     console.log('Filtered incidents updated:', filtered);
-  }, [searchTerm, allIncidents]);
-  
-  const getSeverityColor = (severity: string) => {
+  }, [searchTerm, selectedSeverity, selectedAttackType, allIncidents]); // Add new dependencies
+
+  const getSeverityColor = (severity: Severity) => { // Use Severity type
     switch (severity) {
       case 'critical': return '#dc2626'; // cyber-critical
-      case 'high': return '#ea580c'; // cyber-high  
+      case 'high': return '#ea580c'; // cyber-high
       case 'medium': return '#ca8a04'; // cyber-medium
       case 'low': return '#16a34a'; // cyber-low
-      default: return '#0891b2'; // cyber-info
+      default: return '#0891b2'; // cyber-info (should not be reached with proper Severity type)
     }
   };
 
@@ -156,7 +172,7 @@ const Map = () => {
     // Add incident markers
     filteredIncidents.forEach((incident) => {
       console.log(`Adding marker for incident: ${incident.title} at ${incident.location.lat}, ${incident.location.lng}`);
-      
+
       const markerElement = document.createElement('div');
       markerElement.className = 'cyber-incident-marker';
       markerElement.style.cssText = `
@@ -198,7 +214,7 @@ const Map = () => {
 
     // Initialize map
     mapboxgl.accessToken = mapboxToken;
-    
+
     try {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
@@ -224,7 +240,7 @@ const Map = () => {
       map.current.on('load', () => {
         console.log('Map loaded successfully');
         setMapLoaded(true);
-        
+
         // Add atmosphere and fog effects for the globe
         map.current?.setFog({
           color: 'rgb(30, 30, 50)',
@@ -261,45 +277,8 @@ const Map = () => {
     }
   }, [mapLoaded, filteredIncidents]);
 
-  // if (!mapboxToken) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center p-4">
-  //       <Card className="w-full max-w-md">
-  //         <CardHeader>
-  //           <CardTitle className="gradient-text">CyberSecurity Map Setup</CardTitle>
-  //         </CardHeader>
-  //         <CardContent className="space-y-4">
-  //           <p className="text-muted-foreground">
-  //             Please enter your Mapbox public token to view the cybersecurity incident map.
-  //           </p>
-  //           <Input
-  //             type="text"
-  //             placeholder="Enter Mapbox public token..."
-  //             value={mapboxToken}
-  //             onChange={(e) => setMapboxToken(e.target.value)}
-  //             className="w-full"
-  //           />
-  //           <p className="text-sm text-muted-foreground">
-  //             Get your token at{' '}
-  //             <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-  //               mapbox.com
-  //             </a>
-  //           </p>
-  //         </CardContent>
-  //       </Card>
-  //     </div>
-  //   );
-  // }
-
   return (
     <div className="relative w-full h-screen">
-      {/* Debug Info */}
-      <div className="absolute top-4 right-4 z-10 bg-black/70 text-white p-2 text-xs">
-        <div>Map Loaded: {mapLoaded ? 'Yes' : 'No'}</div>
-        <div>Incidents: {filteredIncidents.length}</div>
-        <div>Token: {mapboxToken ? 'Set' : 'Not Set'}</div>
-      </div>
-
       {/* Search and Stats Panel */}
       <div className="absolute top-4 left-4 z-10 space-y-4">
         <Card className="w-80 cyber-shadow z-100">
@@ -311,8 +290,32 @@ const Map = () => {
               placeholder="Search incidents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full"
+              className="w-full mb-2"
             />
+            {/* Severity Dropdown */}
+            <select
+              value={selectedSeverity}
+              onChange={(e) => setSelectedSeverity(e.target.value as Severity | 'all')}
+              className="w-full p-2 border rounded-md bg-gray-800 text-white text-sm mb-2"
+            >
+              <option value="all">All Severities</option>
+              {SEVERITY_OPTIONS.map(s => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+
+            {/* Attack Type Dropdown */}
+            <select
+              value={selectedAttackType}
+              onChange={(e) => setSelectedAttackType(e.target.value as AttackType | 'all')}
+              className="w-full p-2 border rounded-md bg-gray-800 text-white text-sm mb-2"
+            >
+              <option value="all">All Attack Types</option>
+              {ATTACK_TYPE_OPTIONS.map(at => (
+                <option key={at} value={at}>{at}</option>
+              ))}
+            </select>
+
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-600"></div>
