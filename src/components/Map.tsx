@@ -219,7 +219,9 @@ const Map = () => {
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
         // style: 'mapbox://styles/mapbox/dark-v11',
-        style: 'mapbox://styles/mapbox/light-v11',
+        // style: 'mapbox://styles/mapbox/light-v11',
+        // style: 'mapbox://styles/mapbox/light-v11',
+        style: 'mapbox://styles/mapbox/navigation-day-v1',
         projection: 'globe',
         zoom: 2,
         center: [30, 15],
