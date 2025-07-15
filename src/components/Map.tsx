@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Threat, Severity, AttackType } from '@/types/threats'; // Import Severity and AttackType
 import { useThreats } from '@/hooks/useThreats';
-
+import CountryThreatChart from './CountryChart.tsx';
 // Assuming these types are correctly imported from '@/types/threats'
 // If not, you might need to hardcode them here or adjust the import path.
 const SEVERITY_OPTIONS: Severity[] = ['low', 'medium', 'high', 'critical'];
@@ -147,62 +147,100 @@ const Map = () => {
     console.log('Filtered incidents updated:', filtered);
   }, [searchTerm, selectedSeverity, selectedAttackType, allIncidents]); // Add new dependencies
 
-  const getSeverityColor = (severity: Severity) => { // Use Severity type
-    switch (severity) {
-      case 'critical': return '#dc2626'; // cyber-critical
-      case 'high': return '#ea580c'; // cyber-high
-      case 'medium': return '#ca8a04'; // cyber-medium
-      case 'low': return '#16a34a'; // cyber-low
-      default: return '#0891b2'; // cyber-info (should not be reached with proper Severity type)
-    }
-  };
+const getSeverityColor = (severity: Severity) => { // Use Severity type
+  switch (severity) {
+    case 'critical': return '#dc2626'; // cyber-critical
+    case 'high': return '#ea580c'; // cyber-high
+    case 'medium': return '#ca8a04'; // cyber-medium
+    case 'low': return '#16a34a'; // cyber-low
+    default: return '#0891b2'; // cyber-info (should not be reached with proper Severity type)
+  }
+};
 
-  const addMarkersToMap = () => {
-    if (!map.current || !mapLoaded) {
-      console.log('Map not ready for markers:', { mapExists: !!map.current, mapLoaded });
-      return;
-    }
+const getAttackTypeSymbol = (attackType: AttackType): string => {
+  switch (attackType) {
+    case 'Malware': return '⚠️';
+    case 'Phishing': return '🎣';
+    case 'DDoS': return '💥';
+    case 'Exploit': return '⚡';
+    case 'InsiderThreat': return '👤';
+    case 'Physical': return '🔒';
+    case 'SupplyChain': return '🔗';
+    case 'WebAttack': return '🌐';
+    case 'AccountCompromise': return '🔑';
+    case 'DataBreach': return '📊';
+    case 'Ransomware': return '🔐';
+    default: return '❗';
+  }
+};
 
-    console.log('Adding markers for incidents:', filteredIncidents);
+const addMarkersToMap = () => {
+  if (!map.current || !mapLoaded) {
+    console.log('Map not ready for markers:', { mapExists: !!map.current, mapLoaded });
+    return;
+  }
 
-    // Clear existing markers first
-    const existingMarkers = document.querySelectorAll('.cyber-incident-marker');
-    existingMarkers.forEach(marker => marker.remove());
+  console.log('Adding markers for incidents:', filteredIncidents);
 
-    // Add incident markers
-    filteredIncidents.forEach((incident) => {
-      console.log(`Adding marker for incident: ${incident.title} at ${incident.location.lat}, ${incident.location.lng}`);
+  // Clear existing markers first
+  const existingMarkers = document.querySelectorAll('.cyber-incident-marker');
+  existingMarkers.forEach(marker => marker.remove());
 
-      const markerElement = document.createElement('div');
-      markerElement.className = 'cyber-incident-marker';
-      markerElement.style.cssText = `
-        position: absolute;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        background-color: ${getSeverityColor(incident.severity)};
-        border: 3px solid rgba(255, 255, 255, 0.8);
-        cursor: pointer;
-        box-shadow: 0 0 15px ${getSeverityColor(incident.severity)}aa;
-        z-index: 50;
-        transform: translate(-50%, -50%);
+  // Add incident markers
+  filteredIncidents.forEach((incident) => {
+    console.log(`Adding marker for incident: ${incident.title} at ${incident.location.lat}, ${incident.location.lng}`);
+
+    const markerElement = document.createElement('div');
+    markerElement.className = 'cyber-incident-marker';
+    
+    // Add the symbol as content
+    markerElement.innerHTML = `<span class="threat-symbol">${getAttackTypeSymbol(incident.attackType)}</span>`;
+    
+    markerElement.style.cssText = `
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 80%;
+      background-color: rgba(229, 233, 8, 0.3);
+      border: 3px solid ${getSeverityColor(incident.severity)};
+      cursor: pointer;
+      box-shadow: 0 0 15px ${getSeverityColor(incident.severity)}aa;
+      z-index: 50;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+
+    // Style the symbol
+    const symbolElement = markerElement.querySelector('.threat-symbol') as HTMLElement;
+    if (symbolElement) {
+      symbolElement.style.cssText = `
+        font-size: 12px;
+        line-height: 2;
+        filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.8));
+        user-select: none;
+        pointer-events: none;
       `;
+    }
 
-      const marker = new mapboxgl.Marker({
-        element: markerElement,
-        anchor: 'center'
-      })
-        .setLngLat([incident.location.lng, incident.location.lat])
-        .addTo(map.current!);
+    const marker = new mapboxgl.Marker({
+      element: markerElement,
+      anchor: 'center'
+    })
+      .setLngLat([incident.location.lng, incident.location.lat])
+      .addTo(map.current!);
 
-      console.log(`Marker added for ${incident.title}`);
+    console.log(`Marker added for ${incident.title}`);
 
-      markerElement.addEventListener('click', () => {
-        console.log('Marker clicked:', incident.title);
-        setSelectedIncident(incident);
-      });
+    markerElement.addEventListener('click', () => {
+      console.log('Marker clicked:', incident.title);
+      setSelectedIncident(incident);
     });
-  };
+  });
+};
+
+
 
   useEffect(() => {
     if (!mapContainer.current || !mapboxToken) {
@@ -279,82 +317,87 @@ const Map = () => {
     }
   }, [mapLoaded, filteredIncidents]);
 
-  return (
-    <div className="relative w-full h-screen">
-      {/* Search and Stats Panel */}
-      <div className="absolute top-4 left-4 z-10 space-y-4">
-        <Card className="w-80 cyber-shadow z-100">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm gradient-text">Global Threat Monitor</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Input
-              placeholder="Search incidents..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full mb-2"
-            />
-            {/* Severity Dropdown */}
-            <select
-              value={selectedSeverity}
-              onChange={(e) => setSelectedSeverity(e.target.value as Severity | 'all')}
-              className="w-full p-2 border rounded-md bg-gray-800 text-white text-sm mb-2"
-            >
-              <option value="all">All Severities</option>
-              {SEVERITY_OPTIONS.map(s => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-              ))}
-            </select>
+return (
+  <div className="relative w-full h-screen">
+    {/* Search and Stats Panel - LEFT SIDE */}
+    <div className="absolute top-4 left-4 z-10 space-y-4">
+      <Card className="w-80 cyber-shadow z-100">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm gradient-text">Global Threat Monitor</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            placeholder="Search incidents..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full mb-2"
+          />
+          {/* Severity Dropdown */}
+          <select
+            value={selectedSeverity}
+            onChange={(e) => setSelectedSeverity(e.target.value as Severity | 'all')}
+            className="w-full p-2 border rounded-md bg-gray-800 text-white text-sm mb-2"
+          >
+            <option value="all">All Severities</option>
+            {SEVERITY_OPTIONS.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
 
-            {/* Attack Type Dropdown */}
-            <select
-              value={selectedAttackType}
-              onChange={(e) => setSelectedAttackType(e.target.value as AttackType | 'all')}
-              className="w-full p-2 border rounded-md bg-gray-800 text-white text-sm mb-2"
-            >
-              <option value="all">All Attack Types</option>
-              {ATTACK_TYPE_OPTIONS.map(at => (
-                <option key={at} value={at}>{at}</option>
-              ))}
-            </select>
+          {/* Attack Type Dropdown */}
+          <select
+            value={selectedAttackType}
+            onChange={(e) => setSelectedAttackType(e.target.value as AttackType | 'all')}
+            className="w-full p-2 border rounded-md bg-gray-800 text-white text-sm mb-2"
+          >
+            <option value="all">All Attack Types</option>
+            {ATTACK_TYPE_OPTIONS.map(at => (
+              <option key={at} value={at}>{at}</option>
+            ))}
+          </select>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                <span>Critical: {filteredIncidents.filter(i => i.severity === 'critical').length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-orange-600"></div>
-                <span>High: {filteredIncidents.filter(i => i.severity === 'high').length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
-                <span>Medium: {filteredIncidents.filter(i => i.severity === 'medium').length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                <span>Low: {filteredIncidents.filter(i => i.severity === 'low').length}</span>
-              </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-600"></div>
+              <span>Critical: {filteredIncidents.filter(i => i.severity === 'critical').length}</span>
             </div>
-            <div className="text-xs text-muted-foreground">
-              Total Incidents: {filteredIncidents.length}
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-orange-600"></div>
+              <span>High: {filteredIncidents.filter(i => i.severity === 'high').length}</span>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Map Container */}
-      <div ref={mapContainer} className="absolute inset-0" />
-
-      {/* Incident Popup */}
-      {selectedIncident && (
-        <IncidentPopup
-          incident={selectedIncident}
-          onClose={() => setSelectedIncident(null)}
-        />
-      )}
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-600"></div>
+              <span>Medium: {filteredIncidents.filter(i => i.severity === 'medium').length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-600"></div>
+              <span>Low: {filteredIncidents.filter(i => i.severity === 'low').length}</span>
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Total Incidents: {filteredIncidents.length}
+          </div>
+        </CardContent>
+      </Card>
     </div>
-  );
+
+    {/* Country Threat Chart - RIGHT SIDE */}
+    <div className="absolute top-4 right-4 z-10 space-y-4">
+      <CountryThreatChart incidents={filteredIncidents} />
+    </div>
+
+    {/* Map Container */}
+    <div ref={mapContainer} className="absolute inset-0" />
+
+    {/* Incident Popup */}
+    {selectedIncident && (
+      <IncidentPopup
+        incident={selectedIncident}
+        onClose={() => setSelectedIncident(null)}
+      />
+    )}
+  </div>
+);
 };
 
 export default Map;
