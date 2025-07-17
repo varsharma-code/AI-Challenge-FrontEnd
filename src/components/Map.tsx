@@ -8,6 +8,12 @@ import { toast } from 'sonner';
 import { Threat, Severity, AttackType } from '@/types/threats'; // Import Severity and AttackType
 import { useThreats } from '@/hooks/useThreats';
 import CountryThreatChart from './CountryChart.tsx';
+
+import CountryAnalytics from './countryAnalytics.tsx';
+import SeverityAnalytics from './severityAnalytics.tsx';
+import AttackTypeAnalytics from './attackTypeAnalytics.tsx';
+import TimelineAnalytics from './timelineAnalytics.tsx';
+import { BarChart3, Shield, Zap, Clock } from 'lucide-react';
 // Assuming these types are correctly imported from '@/types/threats'
 // If not, you might need to hardcode them here or adjust the import path.
 const SEVERITY_OPTIONS: Severity[] = ['low', 'medium', 'high', 'critical'];
@@ -102,7 +108,7 @@ const Map = () => {
   const [selectedAttackType, setSelectedAttackType] = useState<AttackType | 'all'>('all'); // New state for attack type filter
   const [filteredIncidents, setFilteredIncidents] = useState<CyberIncident[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
-
+const [activeAnalytic, setActiveAnalytic] = useState<'country' | 'severity' | 'attackType' | 'timeline' | null>(null);
   // Use the hook to fetch threats data
   const { data: threatsResponse, isLoading, error, refetch } = useThreats(); // Renamed data to threatsResponse
   console.log('useThreats hook result:', { threatsResponse, isLoading, error });
@@ -343,7 +349,6 @@ return (
               <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
           </select>
-
           {/* Attack Type Dropdown */}
           <select
             value={selectedAttackType}
@@ -355,7 +360,6 @@ return (
               <option key={at} value={at}>{at}</option>
             ))}
           </select>
-
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-600"></div>
@@ -381,9 +385,58 @@ return (
       </Card>
     </div>
 
-    {/* Country Threat Chart - RIGHT SIDE */}
+    {/* Analytics Buttons Panel - RIGHT SIDE */}
     <div className="absolute top-4 right-4 z-10 space-y-4">
-      <CountryThreatChart incidents={filteredIncidents} />
+      <Card className="w-64 cyber-shadow z-100">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm gradient-text">Analytics Dashboard</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <button
+            onClick={() => setActiveAnalytic('country')}
+            className="w-full flex items-center gap-3 p-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600 rounded-lg transition-all duration-200 text-left group"
+          >
+            <BarChart3 className="w-5 h-5 text-blue-400 group-hover:text-blue-300" />
+            <div>
+              <div className="text-white text-sm font-medium">Country Analysis</div>
+              <div className="text-gray-400 text-xs">Geographic threat distribution</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveAnalytic('severity')}
+            className="w-full flex items-center gap-3 p-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600 rounded-lg transition-all duration-200 text-left group"
+          >
+            <Shield className="w-5 h-5 text-red-400 group-hover:text-red-300" />
+            <div>
+              <div className="text-white text-sm font-medium">Severity Analysis</div>
+              <div className="text-gray-400 text-xs">Risk level breakdown</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveAnalytic('attackType')}
+            className="w-full flex items-center gap-3 p-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600 rounded-lg transition-all duration-200 text-left group"
+          >
+            <Zap className="w-5 h-5 text-purple-400 group-hover:text-purple-300" />
+            <div>
+              <div className="text-white text-sm font-medium">Attack Types</div>
+              <div className="text-gray-400 text-xs">Threat vector analysis</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setActiveAnalytic('timeline')}
+            className="w-full flex items-center gap-3 p-3 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600 rounded-lg transition-all duration-200 text-left group"
+          >
+            <Clock className="w-5 h-5 text-green-400 group-hover:text-green-300" />
+            <div>
+              <div className="text-white text-sm font-medium">Timeline Analysis</div>
+              <div className="text-gray-400 text-xs">Temporal patterns</div>
+            </div>
+          </button>
+        </CardContent>
+      </Card>
     </div>
 
     {/* Map Container */}
@@ -396,8 +449,38 @@ return (
         onClose={() => setSelectedIncident(null)}
       />
     )}
+
+    {/* Analytics Modals */}
+    {activeAnalytic === 'country' && (
+      <CountryAnalytics
+        incidents={filteredIncidents}
+        onClose={() => setActiveAnalytic(null)}
+      />
+    )}
+
+    {activeAnalytic === 'severity' && (
+      <SeverityAnalytics
+        incidents={filteredIncidents}
+        onClose={() => setActiveAnalytic(null)}
+      />
+    )}
+
+    {activeAnalytic === 'attackType' && (
+      <AttackTypeAnalytics
+        incidents={filteredIncidents}
+        onClose={() => setActiveAnalytic(null)}
+      />
+    )}
+
+    {activeAnalytic === 'timeline' && (
+      <TimelineAnalytics
+        incidents={filteredIncidents}
+        onClose={() => setActiveAnalytic(null)}
+      />
+    )}
   </div>
 );
+
 };
 
 export default Map;
